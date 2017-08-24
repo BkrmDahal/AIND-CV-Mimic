@@ -35,8 +35,8 @@ function toUnicode(c) {
 }
 
 // Update score being displayed
-function setScore(correct, total) {
-  $("#score").html("Score: " + correct + " / " + total);
+function setScore(playerScore, totalRound) {
+  $("#score").html("Score: " + playerScore + " / " + totalRound);
 }
 
 // Display log messages and tracking results
@@ -75,6 +75,7 @@ function onReset() {
 
   // TODO(optional): You can restart the game as well
   // <your code here>
+    resetGame();
 };
 
 // Add a callback to notify when camera access is allowed
@@ -103,6 +104,7 @@ detector.addEventListener("onInitializeSuccess", function() {
 
   // TODO(optional): Call a function to initialize the game, if needed
   // <your code here>
+    newGame();
 });
 
 // Add a callback to receive the results from processing an image
@@ -134,6 +136,7 @@ detector.addEventListener("onImageResultsSuccess", function(faces, image, timest
 
     // TODO: Call your function to run the game (define it first!)
     // <your code here>
+    game(faces[0])
   }
 });
 
@@ -145,9 +148,12 @@ function drawFeaturePoints(canvas, img, face) {
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
 
+
   // TODO: Set the stroke and/or fill style you want for each feature point marker
   // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D#Fill_and_stroke_styles
   // <your code here>
+    ctx.fillStyle= 'green';
+    ctx.strokeStyle = 'green';
   
   // Loop over each feature point in the face
   for (var id in face.featurePoints) {
@@ -156,6 +162,9 @@ function drawFeaturePoints(canvas, img, face) {
     // TODO: Draw feature point, e.g. as a circle using ctx.arc()
     // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/arc
     // <your code here>
+      ctx.beginPath();
+      ctx.arc(featurePoint.x, featurePoint.y,3,0,2 * Math.PI, false)
+      ctx.stroke();
   }
 }
 
@@ -166,14 +175,37 @@ function drawEmoji(canvas, img, face) {
 
   // TODO: Set the font and style you want for the emoji
   // <your code here>
-  
+    ctx.font = '50px Verdana'
   // TODO: Draw it using ctx.strokeText() or fillText()
   // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText
   // TIP: Pick a particular feature point as an anchor so that the emoji sticks to your face
   // <your code here>
+    
+    //find boundaries of feature points' array
+    var maxX =0;
+    var minX =0;
+    var maxY =0;
+    var minY =0;
+    for (var id in face.featurePoints) {
+        var featurePoint = face.featurePoints[id];
+        var maxX = Math.max(maxX, featurePoint.x)
+        //var minX = Math.min(maxX, featurePoint.x)
+        //var maxY = Math.max(maxY, featurePoint.y)
+        var minY = Math.min(maxY, featurePoint.y)
+        }
+    //Place emojis to upper right corner
+    ctx.fillText(face.emojis.dominantEmoji,maxX+5,minY+5)
 }
 
 // TODO: Define any variables and functions to implement the Mimic Me! game mechanics
+var randomEmoji = 0;
+var playerScore = 0;
+var totalRound = 0;
+var match = false;
+var timeToGuess= 10;
+var rounds = 10;
+var currentTime = 0;
+var startTime = 0; 
 
 // NOTE:
 // - Remember to call your update function from the "onImageResultsSuccess" event handler above
@@ -182,8 +214,74 @@ function drawEmoji(canvas, img, face) {
 // - Unicode values for all emojis recognized by Affectiva are provided above in the list 'emojis'
 // - To check for a match, you can convert the dominant emoji to unicode using the toUnicode() function
 
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function newRound(){  
+    var randId = getRandomInt(0,emojis.length-1);
+    randomEmoji = emojis[randId];
+    setTargetEmoji(randomEmoji);
+    totalRound = totalRound + 1;
+    setScore(playerScore, totalRound);
+    match = false;
+    //start over the time
+    startTime = Math.round(new Date().getTime()/1000);
+}
+    
+function game(face) {
+    var currentTime = Math.round(new Date().getTime()/1000);
+    //check if time is over
+    if ((currentTime-startTime)>timeToGuess&&(totalRound < rounds)&&!match){
+        alert("Time is over. Next round");
+        return newRound();
+    }
+    //check if no of round is over
+    else if ((currentTime-startTime)>timeToGuess&&(totalRound == rounds)&&(!match)){
+        alert("End game!!!\ntotalRound number of rounds: "
+			+totalRound+"\nNumber of playerScore answers: "+playerScore);
+        return newGame();
+    }
+    //in other case check for match
+    else if (!match) {
+        var currEmoji = toUnicode(face.emojis.dominantEmoji);
+        if(currEmoji == randomEmoji) {
+            playerScore+=1;
+            setScore(playerScore, totalRound);
+            match = true;
+			//if last guess was correct and rounds ended
+            if (totalRound == rounds){
+                setScore(playerScore, totalRound);
+                alert("End game!\ntotalRound number of rounds: "
+					+totalRound+"\nNumber of playerScore answers: "+playerScore);
+                return newGame();
+            }
+            else {return newRound()}
+        }
+    }
+}
+
 // Optional:
 // - Define an initialization/reset function, and call it from the "onInitializeSuccess" event handler above
 // - Define a game reset function (same as init?), and call it from the onReset() function above
 
 // <your code here>
+
+function resetGame() {
+    playerScore = 0;
+    totalRound = 0;
+    randomEmoji = 0;
+    setScore(playerScore, totalRound);
+    setTargetEmoji(randomEmoji);
+    
+}
+
+function newGame() {
+    resetGame();
+    if (confirm("Do you want to play?") == true) {
+        timeToGuess = prompt("Time for guess(In seconds)?");
+        rounds = prompt("How many round of play?");
+        newRound();
+    
+    }
+}
